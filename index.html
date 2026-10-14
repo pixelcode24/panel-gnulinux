@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Panel de Acceso - Dispositivo GNU/Linux</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        alert: {
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            900: '#7f1d1d',
+                            950: '#450a0a'
+                        }
+                    },
+                    animation: {
+                        'pulse-glow-red': 'pulseGlowRed 2.5s infinite ease-in-out',
+                        'glitch': 'glitch 0.4s ease-in-out infinite alternate',
+                        'scanline': 'scanline 8s linear infinite',
+                    },
+                    keyframes: {
+                        pulseGlowRed: {
+                            '0%, 100%': { opacity: '0.4', transform: 'scale(0.98)', filter: 'drop-shadow(0 0 15px rgba(239, 68, 68, 0.3))' },
+                            '50%': { opacity: '0.85', transform: 'scale(1.02)', filter: 'drop-shadow(0 0 30px rgba(239, 68, 68, 0.6))' },
+                        },
+                        scanline: {
+                            '0%': { transform: 'translateY(-100%)' },
+                            '100%': { transform: 'translateY(1000%)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Fluid grid background */
+        .bg-grid-pattern {
+            background-size: 24px 24px;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+        }
+
+        /* Custom Scrollbar for Terminal on Mobile */
+        .terminal-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .terminal-scroll::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .terminal-scroll::-webkit-scrollbar-thumb {
+            background: rgba(239, 68, 68, 0.4);
+            border-radius: 2px;
+        }
+
+        /* Scanline effect layer */
+        .scanlines {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+        }
+
+        /* Touch interaction optimizations */
+        button, div[role="button"] {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased bg-slate-950 text-slate-100 flex flex-col justify-between overflow-x-hidden relative select-none scanlines">
+
+    <div class="fixed inset-0 bg-grid-pattern pointer-events-none z-0"></div>
+    <div id="ambient-glow" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] max-w-[500px] h-[85vw] max-h-[500px] bg-red-600/10 rounded-full blur-[100px] pointer-events-none transition-all duration-700"></div>
+
+    <header class="w-full px-4 sm:px-6 py-3.5 sm:py-4 flex justify-between items-center z-10 border-b border-slate-900 bg-slate-950/80 backdrop-blur-md sticky top-0">
+        <div class="flex items-center space-x-2.5">
+            <span class="relative flex h-2.5 w-2.5">
+              <span id="ping-ring" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span id="ping-dot" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+            </span>
+            <span class="text-[10px] sm:text-xs font-mono tracking-widest text-slate-400 uppercase">TTY1 // HOST-BUS</span>
+        </div>
+        
+        <!-- Live Clock & Dynamic Status Badge -->
+        <div class="flex items-center space-x-2 sm:space-x-3">
+            <div id="clock" class="text-[11px] sm:text-xs font-mono text-slate-400 tracking-wider">00:00:00</div>
+            <div id="connection-badge" class="px-2 sm:px-2.5 py-1 rounded-full bg-red-950/50 border border-red-800/60 text-[10px] sm:text-[11px] font-mono text-red-400 flex items-center space-x-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                <span id="badge-text" class="font-semibold">ERROR_BUS</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-6 z-10 max-w-2xl mx-auto w-full">
+        
+        <!-- Interactive Linux / Device Visual Icon with Touch Area -->
+        <div class="relative mb-6 sm:mb-8 group cursor-pointer my-2" id="icon-container" onclick="attemptConnection()">
+            <!-- Outer Glow Rings -->
+            <div id="glow-ring" class="absolute inset-0 rounded-full bg-red-500/20 blur-xl animate-pulse-glow-red"></div>
+            <div id="border-ring" class="absolute -inset-3 sm:-inset-4 rounded-full border border-red-500/30 transition-all duration-300"></div>
+            <div class="absolute -inset-6 sm:-inset-8 rounded-full border border-slate-900"></div>
+
+            <!-- Main Icon Circle optimized for touch tap -->
+            <div id="icon-box" class="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-slate-900/90 border border-red-900/50 flex items-center justify-center shadow-2xl backdrop-blur-xl transition-all duration-300 active:scale-95">
+                
+                <!-- Tux / Linux SVG Icon -->
+                <svg id="linux-icon" class="w-14 h-14 sm:w-18 sm:h-18 text-red-400/90 transition-all duration-300" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12.002 2c-2.484 0-4.5 2.016-4.5 4.5 0 1.25.512 2.38 1.336 3.203C7.29 10.875 6 12.793 6 15c0 .355.03.702.086 1.043C5.457 16.297 5 16.848 5 17.5 5 18.328 5.672 19 6.5 19c.143 0 .28-.022.412-.062C7.818 20.25 9.775 21 12 21s4.182-.75 5.088-2.062c.132.04.269.062.412.062.828 0 1.5-.672 1.5-1.5 0-.652-.457-1.203-1.086-1.457.056-.341.086-.688.086-1.043 0-2.207-1.29-4.125-2.838-5.297C15.998 8.88 16.5 7.75 16.5 6.5c0-2.484-2.016-4.5-4.498-4.5zm0 2c1.381 0 2.5 1.119 2.5 2.5s-1.119 2.5-2.5 2.5-2.5-1.119-2.5-2.5 1.119-2.5 2.5-2.5zM9.5 7a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm5 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm-2.5 5c2.21 0 4 1.343 4 3 0 .182-.023.36-.068.533-.428.182-.888.337-1.375.463C13.882 15.352 12.98 15 12 15s-1.882.352-2.557.996c-.487-.126-.947-.281-1.375-.463A3.016 3.016 0 0 1 8 15c0-1.657 1.79-3 4-3z"/>
+                </svg>
+
+                <!-- Spinner Overlay for connection attempt -->
+                <div id="connecting-spinner" class="hidden absolute inset-0 rounded-full border-2 border-red-500 border-t-transparent animate-spin"></div>
+            </div>
+        </div>
+
+        <div class="space-y-3 text-center w-full">
+            <h1 id="status-title" class="text-xl sm:text-2xl md:text-3xl font-normal tracking-tight text-slate-100 max-w-lg mx-auto leading-snug px-2">
+                Por favor conecte el dispositivo <span class="font-semibold text-red-400 underline decoration-red-500/40 underline-offset-4">GNU/Linux</span> para tener acceso de uso sobre el dispositivo
+            </h1>
+            
+            <p id="status-subtitle" class="text-xs sm:text-sm text-slate-400 max-w-sm mx-auto font-mono">
+                [!] Dispositivo no detectado en el puerto dev/ttyUSB0.
+            </p>
+        </div>
+
+        <div class="w-full mt-5 bg-slate-900/90 border border-red-900/40 rounded-xl p-3 sm:p-4 text-left font-mono text-[11px] sm:text-xs text-slate-300 shadow-2xl relative overflow-hidden backdrop-blur-md">
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-[10px] text-slate-500">
+                <span class="flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-red-500/80"></span>
+                    <span>dmesg // kernel_log</span>
+                </span>
+                <span id="log-status" class="text-red-400">FAILED (ENODEV)</span>
+            </div>
+            
+            <div id="terminal-body" class="space-y-1.5 max-h-28 sm:max-h-36 overflow-y-auto terminal-scroll pr-1 text-slate-400">
+                <div><span class="text-slate-600">[0.0012]</span> <span class="text-slate-500">usb 1-1:</span> new high-speed USB device number 4 using xhci_hcd</div>
+                <div><span class="text-slate-600">[0.1420]</span> <span class="text-red-400">usb 1-1: device descriptor read/64, error -110</span></div>
+                <div><span class="text-slate-600">[0.2980]</span> <span class="text-red-400">usb 1-1: device not accepting address 4, error -71</span></div>
+                <div class="text-amber-400/90"><span class="text-slate-600">[0.4100]</span> ttyACM0: connection timeout / handshake missing</div>
+                <div id="latest-log" class="text-red-400 font-semibold"><span class="text-slate-600">[0.5120]</span> ERROR: No GNU/Linux device node detected.</div>
+            </div>
+        </div>
+
+        <div class="mt-6 w-full max-w-xs">
+            <button onclick="attemptConnection()" id="action-btn" class="w-full py-3.5 px-5 rounded-xl bg-red-950/40 hover:bg-red-900/50 active:bg-red-900/80 border border-red-800/60 hover:border-red-600 text-xs sm:text-sm font-mono text-red-200 transition-all duration-200 shadow-lg shadow-red-950/40 flex items-center justify-center space-x-2.5 min-h-[48px] touch-manipulation">
+                <svg id="btn-icon" class="w-4 h-4 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span id="btn-text" class="truncate font-medium">Reintentar conexión</span>
+            </button>
+        </div>
+
+    </main>
+
+    <footer class="w-full px-4 sm:px-6 py-3.5 z-10 border-t border-slate-900 bg-slate-950/90 flex flex-col sm:flex-row justify-between items-center text-[11px] font-mono text-slate-500 gap-2">
+        <div class="flex items-center space-x-2 text-center sm:text-left">
+            <span class="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>
+            <span class="truncate">Estado Bus USB: Error de Handshake</span>
+        </div>
+        <div class="text-[10px] sm:text-[11px] text-slate-600">
+            ERR_CODE: <span class="text-red-400/80">E_GNULINUX_DEV_ABSENT</span>
+        </div>
+    </footer>
+
+    <script>
+        // Real-time Clock
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Failure error messages database
+        const errorScenarios = [
+            {
+                title: "Error: Dispositivo GNU/Linux no reconocido",
+                subtitle: "[!] Fallo de negociación USB. Firma del kernel no identificada.",
+                code: "usb_device_descriptor_error",
+                log: "[FATAL] usb 1-1: Device rejected descriptor. Vendor ID missing."
+            },
+            {
+                title: "Error: Permiso denegado (/dev/ttyUSB0)",
+                subtitle: "[!] Se requiere acceso de superusuario o reglas udev específicas.",
+                code: "EACCES_PERMISSION_DENIED",
+                log: "[ERROR] udev: Access rules missing for /dev/ttyACM0. Permission denied."
+            },
+            {
+                title: "Error: Timeout en puerto serie tty",
+                subtitle: "[!] El dispositivo GNU/Linux no respondió a tiempo a la sonda de acceso.",
+                code: "ETIMEDOUT_PORT_RESPONSE",
+                log: "[FAIL] serial: No ACK received from GNU/Linux target within 1500ms."
+            },
+            {
+                title: "Error: Falla de controlador/driver GNU/Linux",
+                subtitle: "[!] Módulo de kernel de destino no cargado o corrupto.",
+                code: "E_DRIVER_MODULE_FAULT",
+                log: "[CRITICAL] kernel: Modprobe failed for option/ftdi_sio driver module."
+            }
+        ];
+
+        let isAttempting = false;
+        let scenarioIndex = 0;
+
+        function attemptConnection() {
+            if (isAttempting) return;
+
+            isAttempting = true;
+            
+            const badge = document.getElementById('connection-badge');
+            const badgeText = document.getElementById('badge-text');
+            const title = document.getElementById('status-title');
+            const subtitle = document.getElementById('status-subtitle');
+            const btnText = document.getElementById('btn-text');
+            const spinner = document.getElementById('connecting-spinner');
+            const linuxIcon = document.getElementById('linux-icon');
+            const terminalBody = document.getElementById('terminal-body');
+            const iconBox = document.getElementById('icon-box');
+            const borderRing = document.getElementById('border-ring');
+            const btnIcon = document.getElementById('btn-icon');
+
+            // Set loading state
+            spinner.classList.remove('hidden');
+            linuxIcon.classList.add('opacity-30');
+            btnText.textContent = "Probando bus de datos...";
+            badgeText.textContent = "SONDANDO...";
+            badge.className = "px-2 sm:px-2.5 py-1 rounded-full bg-amber-950/50 border border-amber-800/60 text-[10px] sm:text-[11px] font-mono text-amber-400 flex items-center space-x-1.5";
+            
+            const timeOffset = (Math.random() * 0.8 + 1.2).toFixed(4);
+
+            // Append probing log
+            const probeLog = document.createElement('div');
+            probeLog.className = "text-amber-400 animate-pulse";
+            probeLog.innerHTML = `<span class="text-slate-600">[${timeOffset}]</span> Probing USB endpoint for GNU/Linux handshake...`;
+            terminalBody.appendChild(probeLog);
+            terminalBody.scrollTop = terminalBody.scrollHeight;
+
+            setTimeout(() => {
+                isAttempting = false;
+                spinner.classList.add('hidden');
+                linuxIcon.classList.remove('opacity-30');
+
+                // Select current error scenario
+                const scenario = errorScenarios[scenarioIndex];
+                scenarioIndex = (scenarioIndex + 1) % errorScenarios.length;
+
+                // Visual Glitch feedback
+                iconBox.classList.add('translate-x-1', 'border-red-500');
+                borderRing.classList.add('border-red-500');
+                
+                setTimeout(() => {
+                    iconBox.classList.remove('translate-x-1', 'border-red-500');
+                    borderRing.classList.remove('border-red-500');
+                }, 200);
+
+                // Revert to error state
+                badgeText.textContent = "CONEXIÓN_FALLIDA";
+                badge.className = "px-2 sm:px-2.5 py-1 rounded-full bg-red-950/60 border border-red-800/80 text-[10px] sm:text-[11px] font-mono text-red-400 flex items-center space-x-1.5";
+
+                title.innerHTML = `Por favor conecte el dispositivo <span class="font-semibold text-red-400 underline decoration-red-500/40 underline-offset-4">GNU/Linux</span> para tener acceso de uso sobre el dispositivo`;
+                subtitle.textContent = scenario.subtitle;
+                btnText.textContent = "Reintentar conexión";
+
+                // Add failure logs
+                probeLog.classList.remove('animate-pulse');
+                probeLog.className = "text-slate-400";
+
+                const errorLogEntry = document.createElement('div');
+                errorLogEntry.className = "text-red-400 font-semibold";
+                const errTime = (parseFloat(timeOffset) + 0.125).toFixed(4);
+                errorLogEntry.innerHTML = `<span class="text-slate-600">[${errTime}]</span> ${scenario.log}`;
+                
+                terminalBody.appendChild(errorLogEntry);
+                terminalBody.scrollTop = terminalBody.scrollHeight;
+
+            }, 1200);
+        }
+    </script>
+</body>
+</html>
